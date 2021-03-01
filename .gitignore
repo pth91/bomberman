@@ -1,5 +1,6 @@
 # PHILIPP, meine ignores
 .bomberman_venv
+README.pdf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
