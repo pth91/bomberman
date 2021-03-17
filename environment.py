@@ -390,7 +390,7 @@ class BombeRLeWorld(GenericWorld):
             'others': [other.get_state() for other in self.active_agents if other is not agent],
             'bombs': [bomb.get_state() for bomb in self.bombs],
             'coins': [coin.get_state() for coin in self.coins if coin.collectable],
-            'user_input': self.user_input,
+            #'user_input': self.user_input,
         }
 
         explosion_map = np.zeros(self.arena.shape)

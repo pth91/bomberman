@@ -1,3 +1,4 @@
+import pandas as pd
 import os
 import sys
 import threading
@@ -84,7 +85,7 @@ def main(argv = None):
             args.agents = ["rule_based_agent"] * (s.MAX_AGENTS - 1)
         for agent_name in args.agents:
             agents.append((agent_name, len(agents) < args.train))
-
+        print(agents[0][0])
         world = BombeRLeWorld(args, agents)
     elif args.command_name == "replay":
         world = ReplayWorld(args)
@@ -103,6 +104,8 @@ def main(argv = None):
 
     # Run one or more games
     for _ in tqdm(range(args.n_rounds)):
+        # PHILIPP:
+        agent_df = pd.DataFrame(['round', 'step', 'field', 'self', 'others', 'bombs', 'coins', 'explosion_map'])
         if not world.running:
             world.ready_for_restart_flag.wait()
             world.ready_for_restart_flag.clear()
@@ -118,7 +121,9 @@ def main(argv = None):
         user_inputs.clear()
 
         # Main game loop
+        rows = []
         while not round_finished:
+            rows.append(world.get_state_for_agent(world.agents[0]))
             if has_gui:
                 # Grab GUI events
                 for event in pygame.event.get():
@@ -153,6 +158,7 @@ def main(argv = None):
             else:
                 # Non-gui mode, check for round end in 1ms
                 sleep(0.001)
+        print(pd.DataFrame.from_dict(rows, orient='columns'))
 
     world.end()
 
