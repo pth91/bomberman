@@ -10,6 +10,7 @@ from environment import BombeRLeWorld, GenericWorld
 from fallbacks import pygame, tqdm, LOADED_PYGAME
 from replay import ReplayWorld
 
+from feat_tools.main import log_gamestates
 
 # Function to run the game logic in a separate thread
 def game_logic(world: GenericWorld, user_inputs, args):
@@ -25,27 +26,58 @@ def game_logic(world: GenericWorld, user_inputs, args):
 
         last_update = now
         if world.running:
-            world.do_step(user_inputs.pop(0) if len(user_inputs) else 'WAIT')
+            world.do_step(user_inputs.pop(0) if len(user_inputs) else "WAIT")
 
 
-def main(argv = None):
+def main(argv=None):
     parser = ArgumentParser()
 
-    subparsers = parser.add_subparsers(dest='command_name', required=True)
+    subparsers = parser.add_subparsers(dest="command_name", required=True)
 
     # Run arguments
     play_parser = subparsers.add_parser("play")
     agent_group = play_parser.add_mutually_exclusive_group()
-    agent_group.add_argument("--my-agent", type=str, help="Play agent of name ... against three rule_based_agents")
-    agent_group.add_argument("--agents", type=str, nargs="+", default=["rule_based_agent"] * s.MAX_AGENTS, help="Explicitly set the agent names in the game")
-    play_parser.add_argument("--train", default=0, type=int, choices=[0, 1, 2, 3, 4],
-                             help="First … agents should be set to training mode")
-    play_parser.add_argument("--continue-without-training", default=False, action="store_true")
+    agent_group.add_argument(
+        "--my-agent",
+        type=str,
+        help="Play agent of name ... against three rule_based_agents",
+    )
+    agent_group.add_argument(
+        "--agents",
+        type=str,
+        nargs="+",
+        default=["rule_based_agent"] * s.MAX_AGENTS,
+        help="Explicitly set the agent names in the game",
+    )
+    play_parser.add_argument(
+        "--train",
+        default=0,
+        type=int,
+        choices=[0, 1, 2, 3, 4],
+        help="First … agents should be set to training mode",
+    )
+    play_parser.add_argument(
+        "--continue-without-training", default=False, action="store_true"
+    )
     # play_parser.add_argument("--single-process", default=False, action="store_true")
 
-    play_parser.add_argument("--n-rounds", type=int, default=10, help="How many rounds to play")
-    play_parser.add_argument("--save-replay", const=True, default=False, action='store', nargs='?', help='Store the game as .pt for a replay')
-    play_parser.add_argument("--no-gui", default=False, action="store_true", help="Deactivate the user interface and play as fast as possible.")
+    play_parser.add_argument(
+        "--n-rounds", type=int, default=10, help="How many rounds to play"
+    )
+    play_parser.add_argument(
+        "--save-replay",
+        const=True,
+        default=False,
+        action="store",
+        nargs="?",
+        help="Store the game as .pt for a replay",
+    )
+    play_parser.add_argument(
+        "--no-gui",
+        default=False,
+        action="store_true",
+        help="Deactivate the user interface and play as fast as possible.",
+    )
 
     # Replay arguments
     replay_parser = subparsers.add_parser("replay")
@@ -53,16 +85,34 @@ def main(argv = None):
 
     # Interaction
     for sub in [play_parser, replay_parser]:
-        sub.add_argument("--fps", type=int, default=15, help="FPS of the GUI (does not change game)")
-        sub.add_argument("--turn-based", default=False, action="store_true",
-                         help="Wait for key press until next movement")
-        sub.add_argument("--update-interval", type=float, default=0.1,
-                         help="How often agents take steps (ignored without GUI)")
-        sub.add_argument("--log_dir", type=str, default=os.path.dirname(os.path.abspath(__file__)) + "/logs")
+        sub.add_argument(
+            "--fps", type=int, default=15, help="FPS of the GUI (does not change game)"
+        )
+        sub.add_argument(
+            "--turn-based",
+            default=False,
+            action="store_true",
+            help="Wait for key press until next movement",
+        )
+        sub.add_argument(
+            "--update-interval",
+            type=float,
+            default=0.1,
+            help="How often agents take steps (ignored without GUI)",
+        )
+        sub.add_argument(
+            "--log_dir",
+            type=str,
+            default=os.path.dirname(os.path.abspath(__file__)) + "/logs",
+        )
 
         # Video?
-        sub.add_argument("--make-video", default=False, action="store_true",
-                         help="Make a video from the game")
+        sub.add_argument(
+            "--make-video",
+            default=False,
+            action="store_true",
+            help="Make a video from the game",
+        )
 
     args = parser.parse_args(argv)
     if args.command_name == "replay":
@@ -85,7 +135,6 @@ def main(argv = None):
             args.agents = ["rule_based_agent"] * (s.MAX_AGENTS - 1)
         for agent_name in args.agents:
             agents.append((agent_name, len(agents) < args.train))
-        print(agents[0][0])
         world = BombeRLeWorld(args, agents)
     elif args.command_name == "replay":
         world = ReplayWorld(args)
@@ -98,14 +147,16 @@ def main(argv = None):
     user_inputs = []
 
     # Start game logic thread
-    t = threading.Thread(target=game_logic, args=(world, user_inputs, args), name="Game Logic")
+    t = threading.Thread(
+        target=game_logic, args=(world, user_inputs, args), name="Game Logic"
+    )
     t.daemon = True
     t.start()
 
     # Run one or more games
+    round = 0
     for _ in tqdm(range(args.n_rounds)):
-        # PHILIPP:
-        agent_df = pd.DataFrame(['round', 'step', 'field', 'self', 'others', 'bombs', 'coins', 'explosion_map'])
+        round = round + 1
         if not world.running:
             world.ready_for_restart_flag.wait()
             world.ready_for_restart_flag.clear()
@@ -121,9 +172,17 @@ def main(argv = None):
         user_inputs.clear()
 
         # Main game loop
-        rows = []
+        agent_0 = []
+        agent_1 = []
+        agent_2 = []
+        agent_3 = []
+        inner_loop = 0
         while not round_finished:
-            rows.append(world.get_state_for_agent(world.agents[0]))
+            inner_loop += 1
+            agent_0.append(world.get_state_for_agent(world.agents[0]))
+            agent_1.append(world.get_state_for_agent(world.agents[1]))
+            agent_2.append(world.get_state_for_agent(world.agents[2]))
+            agent_3.append(world.get_state_for_agent(world.agents[3]))
             if has_gui:
                 # Grab GUI events
                 for event in pygame.event.get():
@@ -158,10 +217,16 @@ def main(argv = None):
             else:
                 # Non-gui mode, check for round end in 1ms
                 sleep(0.001)
-        print(pd.DataFrame.from_dict(rows, orient='columns'))
+        agents_df = [
+            # PHILIPP:
+            # we only need one game_state object as there is no information
+            # exclusive to one agent's game_state
+            pd.DataFrame.from_dict(agent_0, orient="columns"),
+        ]
+        log_gamestates(round, agents_df)
 
     world.end()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
