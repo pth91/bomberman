@@ -70,6 +70,17 @@ def prepare_EntitySet():
     opposing_df.drop_duplicates(subset=common_columns, inplace=True)
     opposing_df.rename(columns={"step": "step_opposing"}, inplace=True)
     opposing_df["step_self"] = self_df["step_self"]
+    opposing_df = opposing_df.explode("others", ignore_index=True)
+    opposing_agents = opposing_df.loc[:, "others"].str[0].unique()
+    opposing_0 = opposing_df[
+        opposing_df.loc[:, "others"].str[0] == opposing_agents[0]
+    ]
+    opposing_1 = opposing_df[
+        opposing_df.loc[:, "others"].str[0] == opposing_agents[1]
+    ]
+    opposing_2 = opposing_df[
+        opposing_df.loc[:, "others"].str[0] == opposing_agents[2]
+    ]
 
     coins_df.drop_duplicates(subset=common_columns, inplace=True)
     coins_df.rename(columns={"step": "step_coins"}, inplace=True)
@@ -126,6 +137,10 @@ def run_tools():
     # then we have to add above relationship to the entity set
     bomberman_entity = bomberman_entity.add_relationship(field_relationship)
     bomberman_entity = bomberman_entity.add_relationship(bombs_relationship)
+
+    feature_matrix, feature_defs = ft.dfs(
+        entityset=bomberman_entity, target_entity="field"
+    )
     print("ha")
 
 
