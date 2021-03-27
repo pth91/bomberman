@@ -58,6 +58,11 @@ def prepare_EntitySet():
     # constructed between tables
     self_df.drop_duplicates(subset=common_columns, inplace=True)
     self_df.rename(columns={"step": "step_self"}, inplace=True)
+    self_df["name"] = self_df.loc[:, "self"].str[0]
+    self_df["score"] = self_df.loc[:, "self"].str[1]
+    self_df["bomb_available"] = self_df.loc[:, "self"].str[2]
+    self_df["location"] = self_df.loc[:, "self"].str[3]
+    self_df.drop("self", inplace=True, axis=1)
 
     field_df.drop_duplicates(subset=common_columns, inplace=True)
     field_df.rename(columns={"step": "step_field"}, inplace=True)
@@ -75,12 +80,36 @@ def prepare_EntitySet():
     opposing_0 = opposing_df[
         opposing_df.loc[:, "others"].str[0] == opposing_agents[0]
     ]
+    opposing_0["name"] = opposing_0.loc[:, "others"].str[0]
+    opposing_0["score"] = opposing_0.loc[:, "others"].str[1]
+    opposing_0["bomb_available"] = opposing_0.loc[:, "others"].str[2]
+    opposing_0["location"] = opposing_0.loc[:, "others"].str[3]
+    opposing_0.drop("others", inplace=True, axis=1)
+    opposing_0.rename(
+        columns={"step_opposing": "step_opposing_0"}, inplace=True
+    )
     opposing_1 = opposing_df[
         opposing_df.loc[:, "others"].str[0] == opposing_agents[1]
     ]
+    opposing_1["name"] = opposing_1.loc[:, "others"].str[0]
+    opposing_1["score"] = opposing_1.loc[:, "others"].str[1]
+    opposing_1["bomb_available"] = opposing_1.loc[:, "others"].str[2]
+    opposing_1["location"] = opposing_1.loc[:, "others"].str[3]
+    opposing_1.drop("others", inplace=True, axis=1)
+    opposing_1.rename(
+        columns={"step_opposing": "step_opposing_1"}, inplace=True
+    )
     opposing_2 = opposing_df[
         opposing_df.loc[:, "others"].str[0] == opposing_agents[2]
     ]
+    opposing_2["name"] = opposing_2.loc[:, "others"].str[0]
+    opposing_2["score"] = opposing_2.loc[:, "others"].str[1]
+    opposing_2["bomb_available"] = opposing_2.loc[:, "others"].str[2]
+    opposing_2["location"] = opposing_2.loc[:, "others"].str[3]
+    opposing_2.drop("others", inplace=True, axis=1)
+    opposing_2.rename(
+        columns={"step_opposing": "step_opposing_2"}, inplace=True
+    )
 
     coins_df.drop_duplicates(subset=common_columns, inplace=True)
     coins_df.rename(columns={"step": "step_coins"}, inplace=True)
@@ -97,26 +126,32 @@ def prepare_EntitySet():
 
     # at this point these entity objects are still empty and we have to
     # supply data
-    bomberman_entity = bomberman_entity.entity_from_dataframe(
-        entity_id="field", dataframe=field_df, index="step_field"
-    )
-    bomberman_entity = bomberman_entity.entity_from_dataframe(
-        entity_id="bombs", dataframe=bombs_df, index="step_bombs"
-    )
+    # bomberman_entity = bomberman_entity.entity_from_dataframe(
+    #    entity_id="field", dataframe=field_df, index="step_field"
+    # )
+    # bomberman_entity = bomberman_entity.entity_from_dataframe(
+    #    entity_id="bombs", dataframe=bombs_df, index="step_bombs"
+    # )
     bomberman_entity = bomberman_entity.entity_from_dataframe(
         entity_id="self", dataframe=self_df, index="step_self"
     )
     bomberman_entity = bomberman_entity.entity_from_dataframe(
-        entity_id="opposing", dataframe=opposing_df, index="step_opposing"
+        entity_id="opposing_0", dataframe=opposing_0, index="step_opposing_0"
     )
     bomberman_entity = bomberman_entity.entity_from_dataframe(
-        entity_id="coins", dataframe=coins_df, index="step_coins"
+        entity_id="opposing_1", dataframe=opposing_1, index="step_opposing_1"
     )
     bomberman_entity = bomberman_entity.entity_from_dataframe(
-        entity_id="explosions",
-        dataframe=explosions_df,
-        index="step_explosions",
+        entity_id="opposing_2", dataframe=opposing_2, index="step_opposing_2"
     )
+    # bomberman_entity = bomberman_entity.entity_from_dataframe(
+    #    entity_id="coins", dataframe=coins_df, index="step_coins"
+    # )
+    # bomberman_entity = bomberman_entity.entity_from_dataframe(
+    #    entity_id="explosions",
+    #    dataframe=explosions_df,
+    #    index="step_explosions",
+    # )
     return bomberman_entity
 
 
@@ -126,20 +161,41 @@ def run_tools():
     bomberman_entity = prepare_EntitySet()
 
     # next, we want to add realtionships between the columns of the entities
-    field_relationship = rs(
+    # field_relationship = rs(
+    #    bomberman_entity["self"]["step_self"],
+    #    bomberman_entity["field"]["step_self"],
+    # )
+    # bombs_relationship = rs(
+    #    bomberman_entity["self"]["step_self"],
+    #    bomberman_entity["bombs"]["step_self"],
+    # )
+    opposing_relationship_0 = rs(
         bomberman_entity["self"]["step_self"],
-        bomberman_entity["field"]["step_self"],
+        bomberman_entity["opposing_0"]["step_self"],
     )
-    bombs_relationship = rs(
+    opposing_relationship_1 = rs(
         bomberman_entity["self"]["step_self"],
-        bomberman_entity["bombs"]["step_self"],
+        bomberman_entity["opposing_1"]["step_self"],
+    )
+    opposing_relationship_2 = rs(
+        bomberman_entity["self"]["step_self"],
+        bomberman_entity["opposing_2"]["step_self"],
     )
     # then we have to add above relationship to the entity set
-    bomberman_entity = bomberman_entity.add_relationship(field_relationship)
-    bomberman_entity = bomberman_entity.add_relationship(bombs_relationship)
+    # bomberman_entity = bomberman_entity.add_relationship(field_relationship)
+    # bomberman_entity = bomberman_entity.add_relationship(bombs_relationship)
+    bomberman_entity = bomberman_entity.add_relationship(
+        opposing_relationship_0
+    )
+    bomberman_entity = bomberman_entity.add_relationship(
+        opposing_relationship_1
+    )
+    bomberman_entity = bomberman_entity.add_relationship(
+        opposing_relationship_2
+    )
 
     feature_matrix, feature_defs = ft.dfs(
-        entityset=bomberman_entity, target_entity="field"
+        entityset=bomberman_entity, target_entity="opposing_0"
     )
     print("ha")
 
