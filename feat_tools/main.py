@@ -1,8 +1,20 @@
 import featuretools as ft
 from featuretools import EntitySet as es
 from featuretools import Relationship as rs
+from featuretools.primitives import AggregationPrimitive, TransformPrimitive
+from featuretools.variable_types import Numeric
 import pandas as pd
 import numpy as np
+
+
+# class ManhattenDistance(TransformPrimitive):
+#    name = "ManhattanDistance"
+#    input_types = [Numeric, Numeric]
+#    return_type = [Numeric, Numeric]
+#
+#    def get_function(self):
+#        def ManhattanDistance(numeric, numeric):
+#            return
 
 
 def log_gamestates(round, agents_df):
@@ -15,6 +27,74 @@ def log_gamestates(round, agents_df):
             f"./feat_tools/game_states_logging/game_state_round-{round}",
         )
         print(type(agents_df[it].iloc[0, 3]))
+
+
+def opposing_agents_generate_features(
+    self_df, opposing_0, opposing_1, opposing_2
+):
+    # create entity set
+    opposing_agents_EntitySet = es(id="bomberman")
+    # at this point these entity objects are still empty and we have to
+    # supply data
+    opposing_agents_EntitySet = (
+        opposing_agents_EntitySet.entity_from_dataframe(
+            entity_id="self", dataframe=self_df, index="step_self"
+        )
+    )
+    opposing_agents_EntitySet = (
+        opposing_agents_EntitySet.entity_from_dataframe(
+            entity_id="opposing_0",
+            dataframe=opposing_0,
+            index="step_opposing_0",
+        )
+    )
+    opposing_agents_EntitySet = (
+        opposing_agents_EntitySet.entity_from_dataframe(
+            entity_id="opposing_1",
+            dataframe=opposing_1,
+            index="step_opposing_1",
+        )
+    )
+    opposing_agents_EntitySet = (
+        opposing_agents_EntitySet.entity_from_dataframe(
+            entity_id="opposing_2",
+            dataframe=opposing_2,
+            index="step_opposing_2",
+        )
+    )
+
+    # add relations
+
+    opposing_relationship_0 = rs(
+        opposing_agents_EntitySet["self"]["step_self"],
+        opposing_agents_EntitySet["opposing_0"]["step_self"],
+    )
+    opposing_relationship_1 = rs(
+        opposing_agents_EntitySet["self"]["step_self"],
+        opposing_agents_EntitySet["opposing_1"]["step_self"],
+    )
+    opposing_relationship_2 = rs(
+        opposing_agents_EntitySet["self"]["step_self"],
+        opposing_agents_EntitySet["opposing_2"]["step_self"],
+    )
+    opposing_agents_EntitySet = opposing_agents_EntitySet.add_relationship(
+        opposing_relationship_0
+    )
+    # opposing_agents_EntitySet = opposing_agents_EntitySet.add_relationship(
+    #    opposing_relationship_1
+    # )
+    # opposing_agents_EntitySet = opposing_agents_EntitySet.add_relationship(
+    #    opposing_relationship_2
+    # )
+
+    feature_matrix, feature_defs = ft.dfs(
+        entityset=opposing_agents_EntitySet,
+        target_entity="opposing_0",
+        agg_primitives=["count", "sum"],
+        max_depth=2,
+    )
+
+    return feature_matrix, feature_defs
 
 
 def prepare_EntitySet():
@@ -62,7 +142,9 @@ def prepare_EntitySet():
     self_df["score"] = self_df.loc[:, "self"].str[1]
     self_df["bomb_available"] = self_df.loc[:, "self"].str[2]
     self_df["location"] = self_df.loc[:, "self"].str[3]
+    self_df["location"] = self_df["location"].apply(lambda x: np.array(x))
     self_df.drop("self", inplace=True, axis=1)
+    self_df.reset_index(inplace=True, drop=True)
 
     field_df.drop_duplicates(subset=common_columns, inplace=True)
     field_df.rename(columns={"step": "step_field"}, inplace=True)
@@ -84,10 +166,16 @@ def prepare_EntitySet():
     opposing_0["score"] = opposing_0.loc[:, "others"].str[1]
     opposing_0["bomb_available"] = opposing_0.loc[:, "others"].str[2]
     opposing_0["location"] = opposing_0.loc[:, "others"].str[3]
+    opposing_0["location"] = opposing_0["location"].apply(
+        lambda x: np.array(x)
+    )
     opposing_0.drop("others", inplace=True, axis=1)
     opposing_0.rename(
         columns={"step_opposing": "step_opposing_0"}, inplace=True
     )
+    opposing_0["step_self"].astype(int)
+    # opposing_0["step_opposing_0"].astype(int)
+    opposing_0.reset_index(inplace=True, drop=True)
     opposing_1 = opposing_df[
         opposing_df.loc[:, "others"].str[0] == opposing_agents[1]
     ]
@@ -95,6 +183,9 @@ def prepare_EntitySet():
     opposing_1["score"] = opposing_1.loc[:, "others"].str[1]
     opposing_1["bomb_available"] = opposing_1.loc[:, "others"].str[2]
     opposing_1["location"] = opposing_1.loc[:, "others"].str[3]
+    opposing_1["location"] = opposing_1["location"].apply(
+        lambda x: np.array(x)
+    )
     opposing_1.drop("others", inplace=True, axis=1)
     opposing_1.rename(
         columns={"step_opposing": "step_opposing_1"}, inplace=True
@@ -106,6 +197,9 @@ def prepare_EntitySet():
     opposing_2["score"] = opposing_2.loc[:, "others"].str[1]
     opposing_2["bomb_available"] = opposing_2.loc[:, "others"].str[2]
     opposing_2["location"] = opposing_2.loc[:, "others"].str[3]
+    opposing_2["location"] = opposing_2["location"].apply(
+        lambda x: np.array(x)
+    )
     opposing_2.drop("others", inplace=True, axis=1)
     opposing_2.rename(
         columns={"step_opposing": "step_opposing_2"}, inplace=True
@@ -124,11 +218,14 @@ def prepare_EntitySet():
     # EntitySet object of feature tools
     bomberman_entity = es(id="bomberman")
 
+    opposing_agents_features = opposing_agents_generate_features(
+        self_df, opposing_0, opposing_1, opposing_2
+    )
     # at this point these entity objects are still empty and we have to
     # supply data
-    # bomberman_entity = bomberman_entity.entity_from_dataframe(
-    #    entity_id="field", dataframe=field_df, index="step_field"
-    # )
+    bomberman_entity = bomberman_entity.entity_from_dataframe(
+        entity_id="field", dataframe=field_df, index="step_field"
+    )
     # bomberman_entity = bomberman_entity.entity_from_dataframe(
     #    entity_id="bombs", dataframe=bombs_df, index="step_bombs"
     # )
@@ -152,51 +249,47 @@ def prepare_EntitySet():
     #    dataframe=explosions_df,
     #    index="step_explosions",
     # )
-    return bomberman_entity
+    return opposing_agents_features
 
 
 def run_tools():
     # we want to start by getting an entity set from one run of the
     # bomberman game
-    bomberman_entity = prepare_EntitySet()
+    opposing_agents_features = prepare_EntitySet()
 
-    # next, we want to add realtionships between the columns of the entities
+    ## next, we want to add realtionships between the columns of the entities
     # field_relationship = rs(
     #    bomberman_entity["self"]["step_self"],
     #    bomberman_entity["field"]["step_self"],
     # )
-    # bombs_relationship = rs(
+    ## bombs_relationship = rs(
+    ##    bomberman_entity["self"]["step_self"],
+    ##    bomberman_entity["bombs"]["step_self"],
+    ## )
+    # opposing_relationship_0 = rs(
     #    bomberman_entity["self"]["step_self"],
-    #    bomberman_entity["bombs"]["step_self"],
+    #    bomberman_entity["opposing_0"]["step_self"],
     # )
-    opposing_relationship_0 = rs(
-        bomberman_entity["self"]["step_self"],
-        bomberman_entity["opposing_0"]["step_self"],
-    )
-    opposing_relationship_1 = rs(
-        bomberman_entity["self"]["step_self"],
-        bomberman_entity["opposing_1"]["step_self"],
-    )
-    opposing_relationship_2 = rs(
-        bomberman_entity["self"]["step_self"],
-        bomberman_entity["opposing_2"]["step_self"],
-    )
-    # then we have to add above relationship to the entity set
-    # bomberman_entity = bomberman_entity.add_relationship(field_relationship)
-    # bomberman_entity = bomberman_entity.add_relationship(bombs_relationship)
-    bomberman_entity = bomberman_entity.add_relationship(
-        opposing_relationship_0
-    )
-    bomberman_entity = bomberman_entity.add_relationship(
-        opposing_relationship_1
-    )
-    bomberman_entity = bomberman_entity.add_relationship(
-        opposing_relationship_2
-    )
-
-    feature_matrix, feature_defs = ft.dfs(
-        entityset=bomberman_entity, target_entity="opposing_0"
-    )
+    # opposing_relationship_1 = rs(
+    #    bomberman_entity["self"]["step_self"],
+    #    bomberman_entity["opposing_1"]["step_self"],
+    # )
+    # opposing_relationship_2 = rs(
+    #    bomberman_entity["self"]["step_self"],
+    #    bomberman_entity["opposing_2"]["step_self"],
+    # )
+    ## then we have to add above relationship to the entity set
+    ## bomberman_entity = bomberman_entity.add_relationship(field_relationship)
+    ## bomberman_entity = bomberman_entity.add_relationship(bombs_relationship)
+    # bomberman_entity = bomberman_entity.add_relationship(
+    #    opposing_relationship_0
+    # )
+    # bomberman_entity = bomberman_entity.add_relationship(
+    #    opposing_relationship_1
+    # )
+    # bomberman_entity = bomberman_entity.add_relationship(
+    #    opposing_relationship_2
+    # )
     print("ha")
 
 
